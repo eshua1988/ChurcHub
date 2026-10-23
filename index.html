@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#16213b" />
+    <meta name="description" content="Church Hub — единое пространство для жизни и развития церкви" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="stylesheet" href="./styles.css" />
+    <title>Church Hub</title>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar" aria-label="Навигация">
+        <div class="brand"><div class="brand-mark">✦</div><div><strong>Church</strong><span>Hub</span></div></div>
+        <nav id="navigation"></nav>
+        <div class="sidebar-bottom"><button id="theme-toggle" class="ghost">◐ Тема</button><button id="settings-button" class="ghost">⚙ Настройки</button></div>
+      </aside>
+      <main class="main">
+        <header class="topbar"><button class="mobile-menu" id="mobile-menu" aria-label="Открыть меню">☰</button><div><p class="eyebrow" id="section-kicker">Церковное пространство</p><h1 id="page-title">Обзор</h1></div><div class="topbar-actions"><button class="icon-button" title="Уведомления">♧<span class="notification-dot"></span></button><button class="profile"><span class="avatar">ЕС</span><span>Елена</span><span class="chevron">⌄</span></button></div></header>
+        <section id="app" class="content"></section>
+      </main>
+    </div>
+    <dialog id="modal"><form method="dialog" id="modal-form"><button class="close" value="cancel" aria-label="Закрыть">×</button><div id="modal-content"></div></form></dialog>
+    <template id="empty-state"><div class="empty"><div>✦</div><h3>Здесь пока пусто</h3><p>Создайте первую запись, чтобы начать работу.</p></div></template>
+    <script src="./app.js"></script>
+  </body>
+</html>
