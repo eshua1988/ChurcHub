@@ -17,12 +17,12 @@
         <div class="sidebar-bottom"><button id="theme-toggle" class="ghost">◐ Тема</button><button id="settings-button" class="ghost">⚙ Настройки</button></div>
       </aside>
       <main class="main">
-        <header class="topbar"><button class="mobile-menu" id="mobile-menu" aria-label="Открыть меню">☰</button><div><p class="eyebrow" id="section-kicker">Церковное пространство</p><h1 id="page-title">Обзор</h1></div><div class="topbar-actions"><button class="icon-button" title="Уведомления">♧<span class="notification-dot"></span></button><button class="profile"><span class="avatar">ЕС</span><span>Елена</span><span class="chevron">⌄</span></button></div></header>
+        <header class="topbar"><button class="mobile-menu" id="mobile-menu" aria-label="Открыть меню">☰</button><div><p class="eyebrow" id="section-kicker">Церковное пространство</p><h1 id="page-title">Обзор</h1></div><div class="topbar-actions"><button class="icon-button" title="Уведомления">♧<span class="notification-dot"></span></button><button class="profile" id="auth-button" title="Войти в общий аккаунт"><span class="avatar" id="profile-initials">ВХ</span><span id="profile-name">Войти</span><span class="chevron">⌄</span></button></div></header>
         <section id="app" class="content"></section>
       </main>
     </div>
     <dialog id="modal"><form method="dialog" id="modal-form"><button class="close" value="cancel" aria-label="Закрыть">×</button><div id="modal-content"></div></form></dialog>
     <template id="empty-state"><div class="empty"><div>✦</div><h3>Здесь пока пусто</h3><p>Создайте первую запись, чтобы начать работу.</p></div></template>
-    <script src="./app.js"></script>
+    <script type="module" src="./app.js"></script>
   </body>
 </html>
