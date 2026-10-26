@@ -1,0 +1,6 @@
+{
+  "name": "church-hub-cloud",
+  "private": true,
+  "scripts": { "check": "node --check cloudflare/worker.js", "deploy": "wrangler deploy" },
+  "devDependencies": { "wrangler": "^4.51.0" }
+}

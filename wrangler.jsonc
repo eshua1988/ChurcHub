@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "church-hub-api",
+  "main": "cloudflare/worker.js",
+  "compatibility_date": "2026-10-26",
+  "assets": {
+    "directory": ".",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"],
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "single-page-application"
+  },
+  "d1_databases": [{ "binding": "HUB_DB" }],
+  "r2_buckets": [{ "binding": "HUB_FILES" }]
+}
