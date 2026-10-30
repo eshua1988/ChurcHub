@@ -76,6 +76,13 @@ export default { async fetch(request, env) {
     await env.HUB_DB.prepare('INSERT INTO hub_rooms (id,name,department,owner_id,access_mode) VALUES (?,?,?,?,?)').bind(roomId, name, String(body.department || name), current.id, body.access_mode === 'all' ? 'all' : 'members').run();
     await env.HUB_DB.prepare('INSERT INTO hub_room_members (room_id,user_id,role) VALUES (?,?,?)').bind(roomId, current.id, 'owner').run(); return json({ id: roomId }, { status: 201 });
   }
+  const roleMatch = url.pathname.match(/^\/api\/users\/([^/]+)\/role$/);
+  if (roleMatch && request.method === 'PATCH') {
+    if (current.role !== 'admin') return fail('Только администратор может изменять роли.', 403);
+    const body = await readJson(request); const role = body.role === 'admin' ? 'admin' : 'member';
+    await env.HUB_DB.prepare('UPDATE hub_users SET role=? WHERE id=?').bind(role, roleMatch[1]).run();
+    return json({ ok: true });
+  }
   const messageMatch = url.pathname.match(/^\/api\/rooms\/([^/]+)\/messages$/);
   if (messageMatch) { const room = await roomAllowed(env, current, messageMatch[1]); if (!room) return fail('Нет доступа к комнате.', 403); if (request.method === 'GET') { const messages = await env.HUB_DB.prepare('SELECT m.*,u.name AS author_name FROM hub_room_messages m JOIN hub_users u ON u.id=m.author_id WHERE m.room_id=? ORDER BY m.created_at DESC LIMIT 100').bind(room.id).all(); return json({ room, messages: messages.results.reverse() }); } if (request.method === 'POST') { const body = await readJson(request); if (!String(body.body || '').trim() && !body.attachment) return fail('Введите сообщение или прикрепите файл.'); await env.HUB_DB.prepare('INSERT INTO hub_room_messages (id,room_id,author_id,body,message_type,attachment) VALUES (?,?,?,?,?,?)').bind(id(), room.id, current.id, String(body.body || body.attachment?.name || ''), body.message_type || 'chat', body.attachment ? JSON.stringify(body.attachment) : null).run(); return json({ ok: true }, { status: 201 }); } }
   const uploadMatch = url.pathname.match(/^\/api\/rooms\/([^/]+)\/files$/);
