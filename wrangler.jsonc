@@ -14,7 +14,7 @@
   {
     "binding": "HUB_DB",
     "database_name": "church-hub",
-    "database_id": "ВСТАВЬТЕ_DATABASE_ID"
+    "database_id": c47f7fd2-0535-4dbd-b299-c3e137c5a6d2
   }
 ],
 "r2_buckets": [
