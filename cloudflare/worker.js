@@ -45,6 +45,12 @@ export default { async fetch(request, env) {
   if (url.pathname === '/api/auth/register' && request.method === 'POST') {
     const body = await readJson(request); const email = String(body.email || '').trim().toLowerCase(); const name = String(body.name || '').trim(); const pass = String(body.password || '');
     if (!/^\S+@\S+\.\S+$/.test(email) || !name || pass.length < 8) return fail('Укажите имя, корректный email и пароль не короче 8 символов.');
+    const existing = await env.HUB_DB.prepare('SELECT * FROM hub_users WHERE email=?').bind(email).first();
+    if (existing) {
+      if (!await validPassword(pass, existing.password)) return fail('Этот email уже зарегистрирован. Используйте правильный пароль, чтобы войти.', 409);
+      const token = id(); await env.HUB_DB.prepare("INSERT INTO hub_sessions (token,user_id,expires_at) VALUES (?,?,datetime('now','+30 days'))").bind(token, existing.id).run();
+      return json({ user: { id: existing.id, email: existing.email, name: existing.name, role: existing.role, department: existing.department } }, { headers: { 'Set-Cookie': `hub_session=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000` } });
+    }
     const count = await env.HUB_DB.prepare('SELECT COUNT(*) AS count FROM hub_users').first(); const userId = id(); const role = count.count === 0 ? 'admin' : 'member';
     try { await env.HUB_DB.prepare('INSERT INTO hub_users (id,email,password,name,role) VALUES (?,?,?,?,?)').bind(userId, email, await password(pass), name, role).run(); } catch { return fail('Этот email уже зарегистрирован.', 409); }
     const token = id(); await env.HUB_DB.prepare("INSERT INTO hub_sessions (token,user_id,expires_at) VALUES (?,?,datetime('now','+30 days'))").bind(token, userId).run();
