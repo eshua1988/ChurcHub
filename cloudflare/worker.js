@@ -52,7 +52,7 @@ export default { async fetch(request, env) {
       return json({ user: { id: existing.id, email: existing.email, name: existing.name, role: existing.role, department: existing.department } }, { headers: { 'Set-Cookie': `hub_session=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000` } });
     }
     const count = await env.HUB_DB.prepare('SELECT COUNT(*) AS count FROM hub_users').first(); const userId = id(); const role = count.count === 0 ? 'admin' : 'member';
-    try { await env.HUB_DB.prepare('INSERT INTO hub_users (id,email,password,name,role) VALUES (?,?,?,?,?)').bind(userId, email, await password(pass), name, role).run(); } catch { return fail('Этот email уже зарегистрирован.', 409); }
+    try { await env.HUB_DB.prepare('INSERT INTO hub_users (id,email,password,name,role) VALUES (?,?,?,?,?)').bind(userId, email, await password(pass), name, role).run(); } catch (error) { console.error('User registration failed', error); return fail('Не удалось создать аккаунт. Попробуйте ещё раз.', 500); }
     const token = id(); await env.HUB_DB.prepare("INSERT INTO hub_sessions (token,user_id,expires_at) VALUES (?,?,datetime('now','+30 days'))").bind(token, userId).run();
     return json({ user: { id: userId, email, name, role } }, { status: 201, headers: { 'Set-Cookie': `hub_session=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000` } });
   }
