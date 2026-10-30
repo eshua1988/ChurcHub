@@ -21,7 +21,7 @@ async function user(request, env) {
   return env.HUB_DB.prepare(`SELECT u.id,u.email,u.name,u.role,u.department FROM hub_sessions s JOIN hub_users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at > datetime('now')`).bind(token).first();
 }
 async function password(value, salt = crypto.getRandomValues(new Uint8Array(16))) {
-  const bytes = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: 120000, hash: 'SHA-256' }, await crypto.subtle.importKey('raw', new TextEncoder().encode(value), 'PBKDF2', false, ['deriveBits']), 256);
+  const bytes = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' }, await crypto.subtle.importKey('raw', new TextEncoder().encode(value), 'PBKDF2', false, ['deriveBits']), 256);
   return `${Array.from(salt).map(v => v.toString(16).padStart(2, '0')).join('')}:${Array.from(new Uint8Array(bytes)).map(v => v.toString(16).padStart(2, '0')).join('')}`;
 }
 async function validPassword(value, stored) { const [salt] = stored.split(':'); return (await password(value, Uint8Array.from(salt.match(/../g).map(v => parseInt(v, 16))))) === stored; }
