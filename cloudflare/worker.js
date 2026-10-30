@@ -11,6 +11,7 @@ async function schema(db) {
     CREATE TABLE IF NOT EXISTS hub_room_members (room_id TEXT NOT NULL, user_id TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'member', PRIMARY KEY (room_id, user_id));
     CREATE TABLE IF NOT EXISTS hub_room_messages (id TEXT PRIMARY KEY, room_id TEXT NOT NULL, author_id TEXT NOT NULL, body TEXT NOT NULL, message_type TEXT NOT NULL DEFAULT 'chat', attachment TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
     CREATE TABLE IF NOT EXISTS hub_room_requests (id TEXT PRIMARY KEY, room_id TEXT NOT NULL, user_id TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(room_id, user_id));
+    CREATE TABLE IF NOT EXISTS hub_invites (token TEXT PRIMARY KEY, telegram_id TEXT NOT NULL, created_by TEXT NOT NULL, used_by TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, used_at TEXT);
   `);
 }
 
@@ -53,6 +54,7 @@ export default { async fetch(request, env) {
     }
     const count = await env.HUB_DB.prepare('SELECT COUNT(*) AS count FROM hub_users').first(); const userId = id(); const role = count.count === 0 ? 'admin' : 'member';
     try { await env.HUB_DB.prepare('INSERT INTO hub_users (id,email,password,name,role) VALUES (?,?,?,?,?)').bind(userId, email, await password(pass), name, role).run(); } catch (error) { console.error('User registration failed', error); return fail('Не удалось создать аккаунт. Попробуйте ещё раз.', 500); }
+    if (body.invite) await env.HUB_DB.prepare("UPDATE hub_invites SET used_by=?,used_at=CURRENT_TIMESTAMP WHERE token=? AND used_by IS NULL").bind(userId, String(body.invite)).run();
     const token = id(); await env.HUB_DB.prepare("INSERT INTO hub_sessions (token,user_id,expires_at) VALUES (?,?,datetime('now','+30 days'))").bind(token, userId).run();
     return json({ user: { id: userId, email, name, role } }, { status: 201, headers: { 'Set-Cookie': `hub_session=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000` } });
   }
@@ -71,6 +73,13 @@ export default { async fetch(request, env) {
     return json({ user: current, people: people.results, rooms: rooms.results });
   }
   const current = await signedIn(request, env); if (!current) return fail('Требуется вход.', 401);
+  if (url.pathname === '/api/invites' && request.method === 'POST') {
+    if (current.role !== 'admin') return fail('Только администратор может приглашать пользователей.', 403);
+    const body = await readJson(request); const telegram = String(body.telegram_id || '').trim();
+    if (!/^@[a-zA-Z0-9_]{5,32}$/.test(telegram)) return fail('Введите Telegram ID в формате @username.');
+    const token = id(); await env.HUB_DB.prepare('INSERT INTO hub_invites (token,telegram_id,created_by) VALUES (?,?,?)').bind(token, telegram, current.id).run();
+    return json({ token, telegram_id: telegram }, { status: 201 });
+  }
   if (url.pathname === '/api/rooms' && request.method === 'POST') {
     const body = await readJson(request); const name = String(body.name || '').trim(); if (!name) return fail('Укажите название комнаты.'); const roomId = id();
     await env.HUB_DB.prepare('INSERT INTO hub_rooms (id,name,department,owner_id,access_mode) VALUES (?,?,?,?,?)').bind(roomId, name, String(body.department || name), current.id, body.access_mode === 'all' ? 'all' : 'members').run();
