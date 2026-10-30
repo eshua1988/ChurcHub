@@ -47,7 +47,7 @@ export default { async fetch(request, env) {
     if (!/^\S+@\S+\.\S+$/.test(email) || !name || pass.length < 8) return fail('Укажите имя, корректный email и пароль не короче 8 символов.');
     const existing = await env.HUB_DB.prepare('SELECT * FROM hub_users WHERE email=?').bind(email).first();
     if (existing) {
-      if (!await validPassword(pass, existing.password)) return fail('Этот email уже зарегистрирован. Используйте правильный пароль, чтобы войти.', 409);
+      if (!await validPassword(pass, existing.password)) return json({ status: 'existing', message: 'Аккаунт с этим email уже существует. Нажмите «Войти» и используйте пароль от созданного аккаунта.' });
       const token = id(); await env.HUB_DB.prepare("INSERT INTO hub_sessions (token,user_id,expires_at) VALUES (?,?,datetime('now','+30 days'))").bind(token, existing.id).run();
       return json({ user: { id: existing.id, email: existing.email, name: existing.name, role: existing.role, department: existing.department } }, { headers: { 'Set-Cookie': `hub_session=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000` } });
     }
@@ -58,7 +58,7 @@ export default { async fetch(request, env) {
   }
   if (url.pathname === '/api/auth/login' && request.method === 'POST') {
     const body = await readJson(request); const account = await env.HUB_DB.prepare('SELECT * FROM hub_users WHERE email=?').bind(String(body.email || '').trim().toLowerCase()).first();
-    if (!account || !await validPassword(String(body.password || ''), account.password)) return fail('Неверный email или пароль.', 401);
+    if (!account || !await validPassword(String(body.password || ''), account.password)) return json({ status: 'invalid_credentials', message: 'Неверный email или пароль.' });
     const token = id(); await env.HUB_DB.prepare("INSERT INTO hub_sessions (token,user_id,expires_at) VALUES (?,?,datetime('now','+30 days'))").bind(token, account.id).run();
     return json({ user: { id: account.id, email: account.email, name: account.name, role: account.role, department: account.department } }, { headers: { 'Set-Cookie': `hub_session=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000` } });
   }
