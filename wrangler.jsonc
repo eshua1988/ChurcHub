@@ -14,7 +14,11 @@
   {
     "binding": "HUB_DB",
     "database_name": "church-hub",
-    "database_id": "вставьте-сюда-Database-ID-из-Cloudflare"
+    "database_id": "ВСТАВЬТЕ_DATABASE_ID"
   }
-]  "r2_buckets": [{ "binding": "HUB_FILES" }]
+],
+"r2_buckets": [
+  {
+    "binding": "HUB_FILES",
+    "bucket_name": "church-hub-files"
 }
