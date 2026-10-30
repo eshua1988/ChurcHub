@@ -57,12 +57,14 @@ export default { async fetch(request, env) {
     return json({ user: { id: account.id, email: account.email, name: account.name, role: account.role, department: account.department } }, { headers: { 'Set-Cookie': `hub_session=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000` } });
   }
   if (url.pathname === '/api/auth/logout' && request.method === 'POST') { const token = cookie(request, 'hub_session'); if (token) await env.HUB_DB.prepare('DELETE FROM hub_sessions WHERE token=?').bind(token).run(); return json({ ok: true }, { headers: { 'Set-Cookie': 'hub_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0' } }); }
-  const current = await signedIn(request, env); if (!current) return fail('Требуется вход.', 401);
   if (url.pathname === '/api/bootstrap') {
+    const current = await signedIn(request, env);
+    if (!current) return json({ user: null, people: [], rooms: [] });
     const people = await env.HUB_DB.prepare('SELECT id,name,email,role,department FROM hub_users ORDER BY name').all();
     const rooms = await env.HUB_DB.prepare('SELECT r.*, u.name AS owner_name FROM hub_rooms r JOIN hub_users u ON u.id=r.owner_id ORDER BY r.created_at').all();
     return json({ user: current, people: people.results, rooms: rooms.results });
   }
+  const current = await signedIn(request, env); if (!current) return fail('Требуется вход.', 401);
   if (url.pathname === '/api/rooms' && request.method === 'POST') {
     const body = await readJson(request); const name = String(body.name || '').trim(); if (!name) return fail('Укажите название комнаты.'); const roomId = id();
     await env.HUB_DB.prepare('INSERT INTO hub_rooms (id,name,department,owner_id,access_mode) VALUES (?,?,?,?,?)').bind(roomId, name, String(body.department || name), current.id, body.access_mode === 'all' ? 'all' : 'members').run();
