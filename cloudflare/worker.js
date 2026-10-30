@@ -5,7 +5,7 @@ const id = () => crypto.randomUUID();
 
 async function schema(db) {
   await db.exec(`
-    CREATE TABLE IF NOT EXISTS hub_users (id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, password TEXT NOT NULL, name TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'member', department TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+    CREATE TABLE IF NOT EXISTS hub_users (id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, password TEXT NOT NULL, name TEXT NOT NULL, first_name TEXT, last_name TEXT, phone TEXT, bio TEXT, birthday TEXT, avatar_key TEXT, role TEXT NOT NULL DEFAULT 'member', department TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
     CREATE TABLE IF NOT EXISTS hub_sessions (token TEXT PRIMARY KEY, user_id TEXT NOT NULL, expires_at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS hub_rooms (id TEXT PRIMARY KEY, name TEXT NOT NULL, department TEXT, owner_id TEXT NOT NULL, access_mode TEXT NOT NULL DEFAULT 'members', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
     CREATE TABLE IF NOT EXISTS hub_room_members (room_id TEXT NOT NULL, user_id TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'member', PRIMARY KEY (room_id, user_id));
@@ -13,13 +13,16 @@ async function schema(db) {
     CREATE TABLE IF NOT EXISTS hub_room_requests (id TEXT PRIMARY KEY, room_id TEXT NOT NULL, user_id TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(room_id, user_id));
     CREATE TABLE IF NOT EXISTS hub_invites (token TEXT PRIMARY KEY, telegram_id TEXT NOT NULL, created_by TEXT NOT NULL, used_by TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, used_at TEXT);
   `);
+  const columns = new Set((await db.prepare('PRAGMA table_info(hub_users)').all()).results.map(column => column.name));
+  const profileColumns = { first_name: 'TEXT', last_name: 'TEXT', phone: 'TEXT', bio: 'TEXT', birthday: 'TEXT', avatar_key: 'TEXT' };
+  for (const [name, type] of Object.entries(profileColumns)) if (!columns.has(name)) await db.exec(`ALTER TABLE hub_users ADD COLUMN ${name} ${type}`);
 }
 
 function cookie(request, name) { return (request.headers.get('Cookie') || '').split(';').map(v => v.trim()).find(v => v.startsWith(`${name}=`))?.slice(name.length + 1); }
 async function user(request, env) {
   const token = cookie(request, 'hub_session');
   if (!token) return null;
-  return env.HUB_DB.prepare(`SELECT u.id,u.email,u.name,u.role,u.department FROM hub_sessions s JOIN hub_users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at > datetime('now')`).bind(token).first();
+  return env.HUB_DB.prepare(`SELECT u.id,u.email,u.name,u.first_name,u.last_name,u.phone,u.bio,u.birthday,u.avatar_key,u.role,u.department FROM hub_sessions s JOIN hub_users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at > datetime('now')`).bind(token).first();
 }
 async function password(value, salt = crypto.getRandomValues(new Uint8Array(16))) {
   const bytes = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' }, await crypto.subtle.importKey('raw', new TextEncoder().encode(value), 'PBKDF2', false, ['deriveBits']), 256);
@@ -68,7 +71,7 @@ export default { async fetch(request, env) {
   if (url.pathname === '/api/bootstrap') {
     const current = await signedIn(request, env);
     if (!current) return json({ user: null, people: [], rooms: [] });
-    const people = await env.HUB_DB.prepare('SELECT id,name,email,role,department FROM hub_users ORDER BY name').all();
+    const people = await env.HUB_DB.prepare('SELECT id,name,email,first_name,last_name,phone,bio,birthday,avatar_key,role,department FROM hub_users ORDER BY name').all();
     const rooms = await env.HUB_DB.prepare('SELECT r.*, u.name AS owner_name FROM hub_rooms r JOIN hub_users u ON u.id=r.owner_id ORDER BY r.created_at').all();
     return json({ user: current, people: people.results, rooms: rooms.results });
   }
@@ -84,6 +87,45 @@ export default { async fetch(request, env) {
     const body = await readJson(request); const name = String(body.name || '').trim(); if (!name) return fail('Укажите название комнаты.'); const roomId = id();
     await env.HUB_DB.prepare('INSERT INTO hub_rooms (id,name,department,owner_id,access_mode) VALUES (?,?,?,?,?)').bind(roomId, name, String(body.department || name), current.id, body.access_mode === 'all' ? 'all' : 'members').run();
     await env.HUB_DB.prepare('INSERT INTO hub_room_members (room_id,user_id,role) VALUES (?,?,?)').bind(roomId, current.id, 'owner').run(); return json({ id: roomId }, { status: 201 });
+  }
+  const avatarMatch = url.pathname.match(/^\/api\/users\/([^/]+)\/avatar$/);
+  if (avatarMatch && request.method === 'POST') {
+    if (current.id !== avatarMatch[1]) return fail('Можно изменить только собственное фото.', 403);
+    const contentType = request.headers.get('content-type') || '';
+    const length = Number(request.headers.get('content-length') || 0);
+    if (!contentType.startsWith('image/') || length > 5 * 1024 * 1024) return fail('Выберите изображение до 5 МБ.');
+    const key = `avatars/${current.id}/${id()}`;
+    await env.HUB_FILES.put(key, request.body, { httpMetadata: { contentType } });
+    await env.HUB_DB.prepare('UPDATE hub_users SET avatar_key=? WHERE id=?').bind(key, current.id).run();
+    return json({ key }, { status: 201 });
+  }
+  const avatarFileMatch = url.pathname.match(/^\/api\/avatars\/(.+)$/);
+  if (avatarFileMatch && request.method === 'GET') {
+    const object = await env.HUB_FILES.get(decodeURIComponent(avatarFileMatch[1]));
+    if (!object) return fail('Фото не найдено.', 404);
+    return new Response(object.body, { headers: { 'content-type': object.httpMetadata?.contentType || 'image/jpeg', 'cache-control': 'private, max-age=3600' } });
+  }
+  const profileMatch = url.pathname.match(/^\/api\/users\/([^/]+)\/profile$/);
+  if (profileMatch) {
+    const targetId = profileMatch[1];
+    if (request.method === 'GET') {
+      const person = await env.HUB_DB.prepare('SELECT id,name,email,first_name,last_name,phone,bio,birthday,avatar_key,role,department FROM hub_users WHERE id=?').bind(targetId).first();
+      if (!person) return fail('Пользователь не найден.', 404);
+      const rooms = await env.HUB_DB.prepare('SELECT r.id,r.name,r.department,r.owner_id,rm.role AS member_role FROM hub_room_members rm JOIN hub_rooms r ON r.id=rm.room_id WHERE rm.user_id=? ORDER BY r.name').bind(targetId).all();
+      return json({ person, rooms: rooms.results });
+    }
+    if (request.method === 'PATCH') {
+      if (current.id !== targetId) return fail('Можно изменить только собственный профиль.', 403);
+      const body = await readJson(request);
+      const first = String(body.first_name || '').trim().slice(0, 60);
+      const last = String(body.last_name || '').trim().slice(0, 60);
+      const name = [first, last].filter(Boolean).join(' ') || current.name;
+      const phone = String(body.phone || '').trim().slice(0, 40);
+      const bio = String(body.bio || '').trim().slice(0, 2000);
+      const birthday = /^\d{4}-\d{2}-\d{2}$/.test(String(body.birthday || '')) ? body.birthday : null;
+      await env.HUB_DB.prepare('UPDATE hub_users SET first_name=?,last_name=?,name=?,phone=?,bio=?,birthday=? WHERE id=?').bind(first || null, last || null, name, phone || null, bio || null, birthday, current.id).run();
+      return json({ ok: true });
+    }
   }
   const roleMatch = url.pathname.match(/^\/api\/users\/([^/]+)\/role$/);
   if (roleMatch && request.method === 'PATCH') {
