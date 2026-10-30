@@ -21,4 +21,6 @@
   {
     "binding": "HUB_FILES",
     "bucket_name": "church-hub-files"
+    }
+  ]
 }
