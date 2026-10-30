@@ -10,6 +10,11 @@
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "single-page-application"
   },
-  "d1_databases": [{ "binding": "HUB_DB" }],
-  "r2_buckets": [{ "binding": "HUB_FILES" }]
+"d1_databases": [
+  {
+    "binding": "HUB_DB",
+    "database_name": "church-hub",
+    "database_id": "вставьте-сюда-Database-ID-из-Cloudflare"
+  }
+]  "r2_buckets": [{ "binding": "HUB_FILES" }]
 }
