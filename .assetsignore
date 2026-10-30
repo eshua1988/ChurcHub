@@ -1,0 +1,12 @@
+# Dependencies and repository metadata must not be published as Worker assets.
+node_modules/
+.git/
+.github/
+
+# Worker source/configuration are bundled separately by Wrangler.
+cloudflare/
+package.json
+package-lock.json
+wrangler.jsonc
+README.md
+.gitignore
